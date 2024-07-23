@@ -81,16 +81,16 @@
 					<h3><a :href="'/produitsdetail/' + product.id">{{ product.nom }}</a></h3>
 					<div class="d-flex">
 						<div class="pricing">
-						<p class="price"><span>{{ product.prix }}</span></p>
+						<p class="price"><span>{{ product.prix }}F</span></p>
 						</div>
 						<div class="rating">
-						<p class="text-right">
-							<a href="#"><span class="ion-ios-star-outline"></span></a>
-							<a href="#"><span class="ion-ios-star-outline"></span></a>
-							<a href="#"><span class="ion-ios-star-outline"></span></a>
-							<a href="#"><span class="ion-ios-star-outline"></span></a>
-							<a href="#"><span class="ion-ios-star-outline"></span></a>
-						</p>
+							<p class="text-right">
+								<a href="#"><span class="ion-ios-star-outline"></span></a>
+								<a href="#"><span class="ion-ios-star-outline"></span></a>
+								<a href="#"><span class="ion-ios-star-outline"></span></a>
+								<a href="#"><span class="ion-ios-star-outline"></span></a>
+								<a href="#"><span class="ion-ios-star-outline"></span></a>
+							</p>
 						</div>
 					</div>
 					<p class="bottom-area d-flex px-3">
@@ -183,6 +183,11 @@
 	components: { FooterPage, HeaderPage },
 	data() {
 	  return {
+		cart: {
+        items: [],
+        subtotal: '0.00',
+        total: '0.00'
+      },
 		showModal: false,
 		isAdmin: false,
 		errorMessage : '',
@@ -198,6 +203,7 @@
 		products: [],
 		categories: [], // Assuming you have categories data
 		filteredProducts: [],
+		isAuthenticated: true, // Replace with actual auth check
 		currentPage: 1,
 		totalPages: 1,
 		limit: 9 // Number of products per page
@@ -215,22 +221,52 @@
 			if (!this.newProduct.idCategory) return "La catégorie du produit est requise.";
 			return null;
     },
-		addProductToCart(product) {
-		let cart = JSON.parse(localStorage.getItem('cart')) || [];
-		const productToAdd = { ...product, quantity: 1 };
+	addProductToCart(product) {
+      let cart = JSON.parse(localStorage.getItem(this.getCartKey())) || { items: [], subtotal: '0.00', total: '0.00' };
 
-		cart.push(productToAdd);
-		localStorage.setItem('cart', JSON.stringify(cart));
+	  // Vérifiez que cart.items est bien un tableau
+      if (!Array.isArray(cart.items)) {
+        cart.items = [];
+      }
+      // Trouvez l'index du produit dans le panier
+      const existingProductIndex = cart.items.findIndex(item => item.id === product.id);
 
-			swal({
-			title: 'Success!',
-			text: `${product.nom} is added to cart!`,
-			icon: 'success',
-			button: 'OK'
-		});
-		this.$emit('product-added-to-cart', cart); // Émettre l'événement avec le panier mis à jour
+      // Ajoutez ou mettez à jour le produit dans le panier
+      if (existingProductIndex !== -1) {
+        cart.items[existingProductIndex].quantity++;
+      } else {
+        cart.items.push({ ...product, quantity: 1 });
+      }
 
-		},
+      // Mettre à jour le sous-total et le total
+      cart.subtotal = this.calculateSubtotal(cart.items);
+      cart.total = this.calculateTotal(cart.subtotal);
+
+      // Sauvegardez le panier mis à jour dans le localStorage
+      localStorage.setItem(this.getCartKey(), JSON.stringify(cart));
+
+      // Affichez un message de succès
+      swal({
+        title: 'Success!',
+        text: `${product.nom} is added to cart!`,
+        icon: 'success',
+        button: 'OK'
+      });
+
+      // Émettez l'événement avec le panier mis à jour
+      this.$emit('product-added-to-cart', cart);
+    },
+	calculateSubtotal(items) {
+      return items.reduce((sum, item) => sum + (item.prix * item.quantity), 0).toFixed(2);
+    },
+    calculateTotal(subtotal) {
+      // Vous pouvez ajouter des calculs supplémentaires pour le total ici, comme les taxes
+      return subtotal;
+    },
+	getCartKey() {
+		const user = JSON.parse(localStorage.getItem('user'));
+		return user ? `cart_${user.email}` : 'cart_guest';
+	},
 
 		async fetchCategories() {
 		try {
@@ -254,6 +290,11 @@
 	},
 
 	async addProduct() {
+  if (!this.validateProduct()) {
+    this.errorMessage = "Please fill in all fields correctly.";
+    return;
+  }
+
   try {
     const token = localStorage.getItem('access_token');
     const config = {
@@ -273,32 +314,29 @@
 
     // Assurez-vous que response.data.produit est correctement défini et utilisé
     if (response.data.produit) {
-
-		swal({
+      swal({
         title: 'Success!',
         text: 'Produit ajouté avec succès.',
         icon: 'success',
         button: 'OK'
       });
-          // Réinitialisez les messages d'erreur
-          this.errorMessage = '';
+      // Réinitialisez les messages
+      this.errorMessage = '';
+      this.successMessage = '';
 
-          // Affichez le message de succès
-          this.successMessage = '';
-          
-          // Réinitialisez le formulaire et fermez le modal
-          this.resetNewProduct();
-          this.showModal = false;
-        } else {
-          // Gérez le cas où response.data.produit n'est pas défini
-          console.error('La réponse de l\'API ne contient pas de produit:', response.data);
-          this.errorMessage = 'Erreur lors de l\'ajout du produit.';
-        }
-      } catch (error) {
-        // Gérez les erreurs de connexion ou autres erreurs
-        console.error('Erreur lors de l\'ajout du produit :', error);
-        this.errorMessage = 'Erreur lors de l\'ajout du produit : ' + error.message;
-      }
+      // Réinitialisez le formulaire et fermez le modal
+      this.resetForm();
+      this.showModal = false;
+    } else {
+      // Gérez le cas où response.data.produit n'est pas défini
+      console.error('La réponse de l\'API ne contient pas de produit:', response.data);
+      this.errorMessage = 'Erreur lors de l\'ajout du produit.';
+    }
+  } catch (error) {
+    // Gérez les erreurs de connexion ou autres erreurs
+    console.error('Erreur lors de l\'ajout du produit :', error);
+    this.errorMessage = 'Erreur lors de l\'ajout du produit : ' + error.message;
+  }
 },
 	  onFileChange(e) {
 		const file = e.target.files[0];
@@ -372,6 +410,10 @@
 		},
 	getImageUrl(photo) {
       return `http://127.0.0.1:8000/storage/photos/${photo}`;
+    },
+	loadCart() {
+      let cart = JSON.parse(localStorage.getItem(this.getCartKey())) || { items: [], subtotal: '0.00', total: '0.00' };
+      this.cart = cart;
     },
 	},
 	mounted() {

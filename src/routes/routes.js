@@ -9,6 +9,8 @@ import CartPage from "../components/CartPage.vue";
 import CheckoutPage from "../components/CheckoutPage.vue";
 import ListeCommandePage from "../components/ListeCommandePage.vue";
 import ValidatedCommandePage from "../components/ValidatedCommandePage.vue";
+import OrderDetailsPage from "../components/OrderDetailsPage.vue";
+import DashboardPage from '../components/DashboardPage.vue';
 
 const routes = [
     {
@@ -55,13 +57,25 @@ const routes = [
         path: '/listecommande',
         component: ListeCommandePage,
         name: 'listecommande',
-        // meta: {requiresAuth: true}
+        meta: {requiresAuth: true}
     },
     {
         path: '/validercommande',
         component: ValidatedCommandePage,
         name: 'validercommande',
-        // meta: {requiresAuth: true}
+        meta: {requiresAuth: true}
+    },
+    {
+        path: '/order-details/:id',
+        name: 'OrderDetailsPage',
+        component: OrderDetailsPage,
+        meta: {requiresAuth: true}
+    },
+    {
+        path: '/dashboard',
+        component: DashboardPage,
+        name: 'dashboard',
+        meta: {requiresAuth: true}
     },
 ]
 

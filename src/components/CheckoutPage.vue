@@ -69,15 +69,13 @@
                                 </div>
                             </div>
                         </div>
-                    </form>
-
-                    <div class="row mt-5 pt-3 d-flex">
+                        <div class="row mt-5 pt-3 d-flex">
                         <div class="col-md-6 d-flex">
                             <div class="cart-detail cart-total bg-light p-3 p-md-4">
                                 <h3 class="billing-heading mb-4">Cart Total</h3>
                                 <p class="d-flex">
                                     <span>Subtotal</span>
-                                    <span>{{ formatCurrency(cart.subtotal) }}</span>
+                                    <span>{{cart.subtotal }}F</span>
                                 </p>
                                 <p class="d-flex">
                                     <span>Delivery</span>
@@ -89,7 +87,7 @@
                                 </p>
                                 <p class="d-flex total-price">
 		    						<span>Total</span>
-		    						<span>{{ formatCurrency(cart.total) }}</span>
+		    						<span>{{ cart.total }}F</span>
 		    					</p>
                                 <!-- Other total details like delivery, discount, and total price -->
                             </div>
@@ -111,10 +109,11 @@
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary py-3 px-4" :disabled="!termsAccepted">Place an order</button>
+                                <button type="submit" class="btn btn-primary py-3 px-4" >Place an order</button>
                             </div>
                         </div>
                     </div>
+                    </form>
                 </div> <!-- .col-md-8 -->
             </div>
         </div>
@@ -122,10 +121,13 @@
 </template>
 
 <script>
+import axios from 'axios';
+import swal from 'sweetalert';
 export default {
     name: 'CheckoutPage',
     data() {
         return {
+            user: null,
             billing: {
                 prenom: '',
                 nom: '',
@@ -143,7 +145,6 @@ export default {
             paymentMethods: [
                 { id: 1, name: 'Cash on Delivery' },
                 { id: 2, name: 'Mobile Payment' }
-                // Add more payment methods as needed
             ],
             selectedPaymentMethod: null,
             termsAccepted: false,
@@ -152,38 +153,56 @@ export default {
         };
     },
     created() {
+        this.loadUser();
         this.loadCart();
-        this.checkUser();
+        this.preFillForm();
     },
     methods: {
-    checkUser() {
-        // Vérifiez si l'utilisateur est connecté
-        const user = JSON.parse(localStorage.getItem('user'));
-        console.log('User from localStorage:', user);
-        if (user) {
-            this.isUserLoggedIn = true;
-            this.billing = {
-                prenom: user.prenom || '',
-                nom: user.nom || '',
-                departement: user.departement ,
-                adresse: user.adresse ,
-                telephone: user.telephone ,
-                email: user.email || '',
-            };
-        }
+        loadUser() {
+            this.user = JSON.parse(localStorage.getItem('user'));
+        },
+        getCartKey() {
+            return this.user ? `cart_${this.user.email}` : 'cart_guest';
+        },
+        loadCart() {
+            const cartKey = this.getCartKey();
+            const cartData = JSON.parse(localStorage.getItem(cartKey)) || { items: [], subtotal: 0, total: 0 };
+            this.cart = cartData;
+            this.calculateTotals();
+        },
+        preFillForm() {
+            if (this.user) {
+                this.isUserLoggedIn = true;
+                this.billing = {
+                    ...this.billing,
+                    prenom: this.user.prenom || '',
+                    nom: this.user.nom || '',
+                    telephone: this.user.telephone  || '',
+                    email: this.user.email || '',
+                    departement: this.user.departement || '',
+                    adresse: this.user.adresse || '',
+                };
+            }else{
+                this.isUserLoggedIn = false;
+                this.billing = {
+                    prenom: '',
+                    nom: '',
+                    departement: '',
+                    adresse: '',
+                    telephone: '',
+                    email: '',
+                    password: ''
+                };
+            }
+        },
+        calculateTotal(item) {
+      return (item.prix * item.quantity).toFixed(2);
     },
-    formatCurrency(value) {
-        return `${value}F`;
-    },
-    loadCart() {
-        const cartItems = JSON.parse(localStorage.getItem('cart')) || [];
-        const subtotal = cartItems.reduce((total, item) => total + (item.prix * item.quantity), 0).toFixed(2);
-        const delivery = 3000; // Exemple de frais de livraison
-        const total = (parseFloat(subtotal) + delivery).toFixed(2);
-
-        this.cart.items = cartItems;
-        this.cart.subtotal = subtotal;
-        this.cart.total = total;
+    calculateTotals() {
+      const subtotal = this.cart.items.reduce((total, item) => total + (item.prix * item.quantity), 0);
+      const delivery = 3000;
+      this.cart.subtotal = subtotal.toFixed(2);
+      this.cart.total = (subtotal + delivery).toFixed(2);
     },
     placeOrder() {
         if (!this.termsAccepted) {
@@ -197,7 +216,7 @@ export default {
 
         const orderData = {
             date_commande: new Date().toISOString().split('T')[0], // or any other date format
-            produits: this.cart.items.map(item => ({
+            products: this.cart.items.map(item => ({
                 id: item.id,
                 quantity: item.quantity
             })),
@@ -207,7 +226,6 @@ export default {
             adresse: this.billing.adresse,
             telephone: this.billing.telephone,
             email: this.billing.email,
-            // payment_method: this.selectedPaymentMethod
         };
 
         if (!this.isUserLoggedIn && this.createAccount) {
@@ -224,12 +242,31 @@ export default {
             }
         })
         .then(response => {
+            swal({
+            title: 'Success!',
+            text: 'Order is added to success!',
+            icon: 'success',
+            button: 'OK'
+        });
             console.log('Order placed!', response.data);
-            // Redirigez vers la confirmation de commande ou procédez à d'autres étapes
-        })
+            this.updateCartQuantities();
+            localStorage.removeItem(this.getCartKey());
+            this.$router.push('/listecommande'); 
+                })
         .catch(error => {
-            console.error('Error placing order:', error);
+            console.error('Error placing order:', error.response ? error.response.data : error.message);
             // Gérez les erreurs ici
+        });
+    },
+
+    updateCartQuantities() {
+        const cartItems = JSON.parse(localStorage.getItem('cart')) || [];
+        cartItems.forEach(item => {
+            // Décrémenter la quantité localement
+            const productElement = this.cart.items.find(prod => prod.id === item.id);
+            if (productElement) {
+                productElement.quantity -= item.quantity;
+            }
         });
     },
     registerAndOrder(orderData) {
@@ -239,10 +276,11 @@ export default {
             // Enregistrez le token et l'utilisateur dans le localStorage
             localStorage.setItem('access_token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data.user));
-            // Redirigez vers la confirmation de commande ou procédez à d'autres étapes
+            localStorage.removeItem(this.getCartKey());
+            this.$router.push('/listecommande'); // Redirige vers la page de confirmation
         })
         .catch(error => {
-            console.error('Error registering and placing order:', error);
+            console.error('Error registering and placing order:', error.response ? error.response.data : error.message);
             // Gérez les erreurs ici
         });
     }
