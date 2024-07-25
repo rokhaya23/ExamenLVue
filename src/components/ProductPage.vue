@@ -231,6 +231,33 @@
       // Trouvez l'index du produit dans le panier
       const existingProductIndex = cart.items.findIndex(item => item.id === product.id);
 
+
+  // Déterminer la quantité actuelle du produit dans le panier
+ 		 let currentQuantity = existingProductIndex !== -1 ? cart.items[existingProductIndex].quantity : 0;
+
+		// Vérifier si le produit est en stock
+		if (product.quantite_stock <= 0) {
+		swal({
+			title: 'Out of Stock',
+			text: `Sorry, ${product.nom} is currently out of stock.`,
+			icon: 'error',
+			button: 'OK'
+		});
+		return;
+		}
+
+		// Vérifier si la quantité demandée est disponible
+		if (currentQuantity + 1 > product.quantite_stock) {
+		swal({
+			title: 'Stock Unavailable',
+			text: `Sorry, only ${product.quantite_stock} units of ${product.nom} are available.`,
+			icon: 'error',
+			button: 'OK'
+		});
+		return;
+		}
+
+
       // Ajoutez ou mettez à jour le produit dans le panier
       if (existingProductIndex !== -1) {
         cart.items[existingProductIndex].quantity++;

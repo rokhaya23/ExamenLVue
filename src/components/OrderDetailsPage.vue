@@ -126,6 +126,8 @@ export default {
           icon: 'success',
           button: 'OK'
         });
+        this.$router.push({ name: 'listecommande' });
+
       })
       .catch(error => {
         console.error('Erreur lors de la mise à jour de la commande:', error);
@@ -135,7 +137,7 @@ export default {
       return `http://127.0.0.1:8000/storage/photos/${photo}`;
     },
     removeOrder(index) {
-      this.order.products.splice(index, 1);
+      this.order.produits.splice(index, 1);
     }
   }
 };

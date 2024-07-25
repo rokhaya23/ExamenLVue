@@ -77,7 +77,7 @@
             </p>
           </div>
           <p class="text-center">
-            <a href="/checkout" class="btn btn-primary py-3 px-4">Proceed to Checkout</a>
+            <button @click="proceedToCheckout" class="btn btn-primary py-3 px-4">Proceed to Checkout</button>
           </p>
         </div>
       </div>
@@ -153,6 +153,30 @@ export default {
     getImageUrl(photo) {
       return `http://127.0.0.1:8000/storage/photos/${photo}`;
     },
+    async checkStockBeforeCheckout() {
+      for (const item of this.cart.items) {
+        // Remplacez cette URL par l'URL de votre API qui vérifie le stock d'un produit
+        const response = await fetch(`http://127.0.0.1:8000/api/products/${item.id}/stock`);
+        const product = await response.json();
+
+        if (item.quantity > product.quantite_stock) {
+          swal({
+            title: 'Stock Unavailable',
+            text: `Sorry, only ${product.quantite_stock} units of ${product.nom} are available.`,
+            icon: 'error',
+            button: 'OK'
+          });
+          return false;
+        }
+      }
+      return true;
+    },
+    async proceedToCheckout() {
+      const isStockAvailable = await this.checkStockBeforeCheckout();
+      if (isStockAvailable) {
+        this.$router.push('/checkout');
+      }
+    }
   },
   watch: {
     cart: {
